@@ -1,6 +1,65 @@
 const express = require('express');
 const router = express.Router();
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
+const jwt = require('jsonwebtoken');
 const User = require('../models/user.model');
+
+// JWT secret key
+const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
+
+// Middleware to verify JWT token
+const verifyToken = async (req, res, next) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ error: 'No token provided' });
+    }
+
+    const token = authHeader.split(' ')[1];
+    const decoded = jwt.verify(token, JWT_SECRET);
+    
+    // Add user data to request
+    req.user = decoded;
+    next();
+  } catch (error) {
+    return res.status(401).json({ error: 'Invalid token' });
+  }
+};
+
+// Configure multer for handling file uploads
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    const uploadDir = 'uploads/profiles';
+    // Create directory if it doesn't exist
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+    cb(null, uploadDir);
+  },
+  filename: function (req, file, cb) {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, 'profile-' + uniqueSuffix + path.extname(file.originalname));
+  }
+});
+
+const upload = multer({
+  storage: storage,
+  limits: {
+    fileSize: 5 * 1024 * 1024 // 5MB limit
+  },
+  fileFilter: function (req, file, cb) {
+    const filetypes = /jpeg|jpg|png/;
+    const mimetype = filetypes.test(file.mimetype);
+    const extname = filetypes.test(path.extname(file.originalname).toLowerCase());
+    
+    if (mimetype && extname) {
+      return cb(null, true);
+    }
+    cb(new Error('Only .png, .jpg and .jpeg format allowed!'));
+  }
+});
 
 // Create a new user
 router.post('/users', async (req, res) => {
@@ -57,18 +116,57 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({ error: 'Invalid password' });
     }
 
+    // Generate JWT token
+    const token = jwt.sign(
+      { id: user._id, username: user.username, role: user.role },
+      JWT_SECRET,
+      { expiresIn: '24h' }
+    );
+
     // Don't send password back
     const userResponse = user.toObject();
     delete userResponse.password;
 
-    res.json({ user: userResponse });
+    res.json({
+      user: userResponse,
+      token
+    });
   } catch (error) {
     res.status(400).json({ error: error.message });
   }
 });
 
+// Handle profile image upload
+router.post('/upload-profile-image', verifyToken, upload.single('image'), async (req, res) => {
+  try {
+    if (!req.file) {
+      console.error('No file received in request');
+      return res.status(400).json({ error: 'No image file provided' });
+    }
+
+    console.log('File received:', req.file);
+    const imageUrl = `/uploads/profiles/${req.file.filename}`;
+    
+    // Update user profile with new image URL
+    const user = await User.findByIdAndUpdate(
+      req.user.id,
+      { profileImage: imageUrl },
+      { new: true }
+    );
+
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    res.json({ imageUrl });
+  } catch (error) {
+    console.error('Error uploading image:', error);
+    res.status(400).json({ error: error.message });
+  }
+});
+
 // Update user profile
-router.put('/users/:id', async (req, res) => {
+router.put('/users/:id/profile', verifyToken, async (req, res) => {
   try {
     const { id } = req.params;
     const updateData = req.body;
@@ -84,18 +182,14 @@ router.put('/users/:id', async (req, res) => {
   }
 });
 
-// Get current user by username
-router.get('/users/me', async (req, res) => {
+// Get current user from token
+router.get('/users/me', verifyToken, async (req, res) => {
   try {
-    // Get username from query parameter
-    const { username } = req.query;
+    // Get user ID from token
+    const { id } = req.user;
     
-    if (!username) {
-      return res.status(400).json({ error: 'Username is required' });
-    }
-    
-    // Find user by username
-    const user = await User.findOne({ username });
+    // Find user by ID
+    const user = await User.findById(id);
     if (!user) {
       return res.status(404).json({ error: 'User not found' });
     }

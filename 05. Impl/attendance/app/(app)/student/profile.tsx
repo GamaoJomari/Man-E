@@ -1,15 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator } from 'react-native';
-import { COLORS, SIZES, SHADOWS } from '../../constants/theme';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, Image, Platform } from 'react-native';
+import { COLORS, SIZES, SHADOWS } from '../../../constants/theme';
 import { router } from 'expo-router';
-import { getCurrentUser, updateUserProfile, loginUser } from '../../services/auth.service';
+import * as ImagePicker from 'expo-image-picker';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { API_URL } from '../../../constants/config';
+import { getCurrentUser, updateProfile, uploadProfileImage } from '../../../services/auth.service';
 
 export default function ProfileEdit() {
   const [profile, setProfile] = useState({
     fullName: '',
     phoneNumber: '',
     studentId: '',
+    profileImage: null as string | null,
   });
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(true);
@@ -19,60 +22,38 @@ export default function ProfileEdit() {
   useEffect(() => {
     const fetchUserProfile = async () => {
       try {
-        setFetching(true);
-        const userData = await getCurrentUser();
-        console.log('Fetched user data:', userData);
-        
-        // Set the user ID if available
-        if (userData._id) {
-          setUserId(userData._id);
-        } else if (userData.id) {
-          setUserId(userData.id);
-        } else {
-          // If no ID is found, try to get it by re-logging in
-          try {
-            // Get stored credentials
-            const storedUser = await AsyncStorage.getItem('user');
-            if (storedUser) {
-              const parsedUser = JSON.parse(storedUser);
-              if (parsedUser.username && parsedUser.password) {
-                // Make a login request to get the user ID
-                const response = await fetch('http://localhost:3000/api/login', {
-                  method: 'POST',
-                  headers: {
-                    'Content-Type': 'application/json',
-                  },
-                  body: JSON.stringify({
-                    username: parsedUser.username,
-                    password: parsedUser.password,
-                    role: parsedUser.role || 'student'
-                  }),
-                });
-                
-                if (response.ok) {
-                  const data = await response.json();
-                  if (data.user && data.user._id) {
-                    setUserId(data.user._id);
-                    // Update the stored user data with the ID
-                    const updatedUser = { ...parsedUser, _id: data.user._id };
-                    await AsyncStorage.setItem('user', JSON.stringify(updatedUser));
-                  }
-                }
-              }
-            }
-          } catch (error) {
-            console.error('Error getting user ID:', error);
-          }
+        const storedUser = await AsyncStorage.getItem('user');
+        const token = await AsyncStorage.getItem('token');
+
+        if (!token || !storedUser) {
+          throw new Error('Authentication required. Please log in again.');
         }
-        
+
+        const userData = JSON.parse(storedUser);
+        setUserId(userData._id);
+
+        // Set the profile data
         setProfile({
           fullName: userData.fullName || '',
           phoneNumber: userData.phoneNumber || '',
           studentId: userData.studentId || '',
+          profileImage: userData.profileImage || null,
         });
+
+        // Also fetch fresh data from the server
+        const freshData = await getCurrentUser();
+        if (freshData) {
+          setProfile({
+            fullName: freshData.fullName || '',
+            phoneNumber: freshData.phoneNumber || '',
+            studentId: freshData.studentId || '',
+            profileImage: freshData.profileImage || null,
+          });
+        }
       } catch (error) {
-        Alert.alert('Error', 'Failed to load profile data');
         console.error('Error fetching profile:', error);
+        Alert.alert('Error', error instanceof Error ? error.message : 'Failed to load profile data');
+        router.replace('/(auth)/login');
       } finally {
         setFetching(false);
       }
@@ -85,65 +66,86 @@ export default function ProfileEdit() {
     setProfile({ ...profile, [field]: value });
   };
 
-  const handleSubmit = async () => {
-    setLoading(true);
+  const pickImage = async () => {
     try {
-      // If we don't have a user ID yet, try to get it
-      if (!userId) {
-        // Get stored credentials
-        const storedUser = await AsyncStorage.getItem('user');
-        if (storedUser) {
-          const parsedUser = JSON.parse(storedUser);
-          if (parsedUser.username && parsedUser.password) {
-            try {
-              // Try to login again to get the user ID
-              const userData = await loginUser(
-                parsedUser.username,
-                parsedUser.password,
-                parsedUser.role || 'student'
-              );
-              
-              if (userData._id) {
-                setUserId(userData._id);
-                console.log('Got user ID from login:', userData._id);
-              } else {
-                throw new Error('User ID not found in login response');
-              }
-            } catch (loginError) {
-              console.error('Login error:', loginError);
-              throw new Error('Failed to get user ID. Please log out and log in again.');
-            }
-          } else {
-            throw new Error('Username or password not found. Please log out and log in again.');
-          }
-        } else {
-          throw new Error('User data not found. Please log out and log in again.');
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      
+      if (status !== 'granted') {
+        Alert.alert('Permission needed', 'Please grant permission to access your photos');
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+        base64: Platform.OS === 'web',
+      });
+
+      if (!result.canceled && result.assets && result.assets[0]) {
+        setLoading(true);
+        const token = await AsyncStorage.getItem('token');
+        if (!token) {
+          throw new Error('Authentication token not found. Please log out and log in again.');
         }
+
+        // Get the image URI
+        const imageUri = result.assets[0].uri;
+        
+        // Upload the image
+        const imageUrl = await uploadProfileImage(imageUri);
+        
+        // Update the profile with the new image URL
+        setProfile(prev => ({ ...prev, profileImage: imageUrl }));
+        Alert.alert('Success', 'Profile image updated successfully');
       }
-      
-      // Now we should have a user ID
-      if (!userId) {
-        throw new Error('User ID not found. Please log out and log in again.');
-      }
-      
-      console.log('Updating profile with ID:', userId);
-      console.log('Update data:', profile);
-      
-      const result = await updateUserProfile(userId, profile);
-      console.log('Update result:', result);
-      
-      Alert.alert(
-        'Success', 
-        'Your profile has been updated successfully!',
-        [{ text: 'OK', onPress: () => router.back() }]
-      );
-    } catch (error: unknown) {
-      console.error('Error updating profile:', error);
-      const err = error as Error;
-      Alert.alert('Error', `Failed to update profile: ${err.message}`);
+    } catch (error) {
+      console.error('Error picking image:', error);
+      Alert.alert('Error', error instanceof Error ? error.message : 'Failed to update profile image');
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleSubmit = async () => {
+    setLoading(true);
+    try {
+      const storedUser = await AsyncStorage.getItem('user');
+      const token = await AsyncStorage.getItem('token');
+      if (!token) {
+        throw new Error('Authentication token not found. Please log out and log in again.');
+      }
+      if (!userId) {
+        throw new Error('User ID not found');
+      }
+      await updateProfile(userId, {
+        fullName: profile.fullName,
+        phoneNumber: profile.phoneNumber,
+        studentId: profile.studentId,
+        profileImage: profile.profileImage || undefined
+      });
+      Alert.alert('Success', 'Profile updated successfully');
+      router.back();
+    } catch (error) {
+      console.error('Error updating profile:', error);
+      Alert.alert('Error', error instanceof Error ? error.message : 'Failed to update profile');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Function to get the correct image URL
+  const getImageUrl = (url: string | null) => {
+    if (!url) return '';
+    
+    // If the URL is already a full URL, return it as is
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      return url;
+    }
+    
+    // If it's a relative URL, prepend the API URL
+    return `${API_URL}${url.startsWith('/') ? '' : '/'}${url}`;
   };
 
   if (fetching) {
@@ -159,6 +161,18 @@ export default function ProfileEdit() {
     <View style={styles.container}>
       <Text style={styles.title}>Edit Profile</Text>
       <View style={styles.form}>
+        <TouchableOpacity style={styles.imageContainer} onPress={pickImage}>
+          {profile.profileImage ? (
+            <Image 
+              source={{ uri: getImageUrl(profile.profileImage) }} 
+              style={styles.profileImage} 
+            />
+          ) : (
+            <View style={styles.placeholderImage}>
+              <Text style={styles.placeholderText}>Tap to add photo</Text>
+            </View>
+          )}
+        </TouchableOpacity>
         <Text style={styles.label}>Full Name</Text>
         <TextInput
           style={styles.input}
@@ -190,6 +204,30 @@ export default function ProfileEdit() {
 }
 
 const styles = StyleSheet.create({
+  imageContainer: {
+    alignItems: 'center',
+    marginBottom: SIZES.large,
+  },
+  profileImage: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    marginBottom: SIZES.small,
+  },
+  placeholderImage: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: COLORS.gray,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  placeholderText: {
+    color: COLORS.white,
+    fontSize: SIZES.medium,
+    textAlign: 'center',
+    padding: SIZES.small,
+  },
   container: {
     flex: 1,
     padding: SIZES.medium,

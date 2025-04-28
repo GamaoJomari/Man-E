@@ -4,7 +4,7 @@ import { router } from 'expo-router';
 import { COLORS, SIZES, SHADOWS } from '../../constants/theme';
 import BurgerMenu from '../../components/BurgerMenu';
 import { useUserRole } from '../../context/UserRoleContext';
-import { loginUser } from '../../services/auth.service';
+import { login } from '../../../services/auth.service';
 
 export default function LoginScreen() {
   const { currentRole } = useUserRole();
@@ -30,7 +30,7 @@ export default function LoginScreen() {
 
     setIsLoading(true);
     try {
-      await loginUser(username, password, currentRole);
+      const { token, user } = await login(username, password, currentRole);
       setIsLoading(false);
       clearInputs();
       

@@ -30,6 +30,10 @@ const userSchema = new mongoose.Schema({
     type: String,
     required: true,
   },
+  profileImage: {
+    type: String, // This will store the image URL
+    default: null,
+  },
   createdAt: {
     type: Date,
     default: Date.now,
