@@ -10,6 +10,8 @@ export interface User {
   role: string;
   fullName?: string;
   studentId?: string;
+  instructorId?: string;
+  adminId?: string;
   phoneNumber?: string;
 }
 
@@ -78,10 +80,7 @@ export async function createUser(userData: User) {
         'Content-Type': 'application/json',
         'Accept': 'application/json'
       },
-      body: JSON.stringify({
-        ...userData,
-        role: 'student'  // Ensure role is set to student
-      }),
+      body: JSON.stringify(userData),
     });
 
     console.log('Response status:', response.status);
@@ -103,6 +102,62 @@ export async function logout() {
     await AsyncStorage.removeItem('user');
   } catch (error) {
     console.error('Logout error:', error);
+    throw error;
+  }
+}
+
+export async function getCurrentUser() {
+  try {
+    const userJson = await AsyncStorage.getItem('user');
+    if (!userJson) {
+      throw new Error('No user found in storage');
+    }
+    return JSON.parse(userJson);
+  } catch (error) {
+    console.error('Get current user error:', error);
+    throw error;
+  }
+}
+
+export async function updateUserProfile(userId: string, profileData: Partial<User>) {
+  try {
+    console.log('Updating user profile with ID:', userId);
+    console.log('Update data:', profileData);
+    
+    // Make sure we're using the correct API URL format
+    const url = `${API_URL}/users/${userId}`;
+    console.log('Full API URL:', url);
+    
+    const { response, data } = await logRequest(url, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify(profileData),
+    });
+
+    console.log('Response status:', response.status);
+    console.log('Response data:', data);
+
+    if (!response.ok) {
+      throw new Error(data.error || 'Failed to update profile');
+    }
+
+    // Update the stored user data
+    try {
+      const currentUser = await getCurrentUser();
+      const updatedUser = { ...currentUser, ...data };
+      await AsyncStorage.setItem('user', JSON.stringify(updatedUser));
+      console.log('Updated user data in storage:', updatedUser);
+    } catch (storageError) {
+      console.error('Error updating stored user data:', storageError);
+      // Continue even if storage update fails
+    }
+
+    return data;
+  } catch (error) {
+    console.error('Update profile error:', error);
     throw error;
   }
 }

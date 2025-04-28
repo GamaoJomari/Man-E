@@ -67,4 +67,47 @@ router.post('/login', async (req, res) => {
   }
 });
 
+// Update user profile
+router.put('/users/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updateData = req.body;
+    const user = await User.findByIdAndUpdate(id, updateData, { new: true });
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    const userResponse = user.toObject();
+    delete userResponse.password;
+    res.json(userResponse);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// Get current user by username
+router.get('/users/me', async (req, res) => {
+  try {
+    // Get username from query parameter
+    const { username } = req.query;
+    
+    if (!username) {
+      return res.status(400).json({ error: 'Username is required' });
+    }
+    
+    // Find user by username
+    const user = await User.findOne({ username });
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    // Don't send password back
+    const userResponse = user.toObject();
+    delete userResponse.password;
+    
+    res.json(userResponse);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
 module.exports = router;

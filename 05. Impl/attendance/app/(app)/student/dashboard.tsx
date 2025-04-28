@@ -33,7 +33,7 @@ export default function StudentDashboard() {
             <Text style={styles.cardDescription}>View past attendance</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.card}>
+          <TouchableOpacity style={styles.card} onPress={() => router.push('/student/profile')}>
             <Text style={styles.cardTitle}>Profile</Text>
             <Text style={styles.cardDescription}>View and edit profile</Text>
           </TouchableOpacity>
