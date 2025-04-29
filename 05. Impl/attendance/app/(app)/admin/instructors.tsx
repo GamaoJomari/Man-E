@@ -79,6 +79,36 @@ export default function InstructorsView() {
     });
   };
 
+  const deleteInstructor = async (instructorId: string) => {
+    try {
+      const token = await AsyncStorage.getItem('token');
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
+
+      const response = await fetch(`${API_URL}/api/users/${instructorId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
+        }
+      });
+
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to delete instructor');
+      }
+
+      // Remove the instructor from the local state
+      setInstructors(instructors.filter(instructor => instructor._id !== instructorId));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to delete instructor');
+      console.error('Error deleting instructor:', err);
+    }
+  };
+
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
@@ -106,12 +136,23 @@ export default function InstructorsView() {
         <Text style={styles.instructorDetail}>Phone: {item.phoneNumber}</Text>
         <Text style={styles.instructorDetail}>Registered: {formatDate(item.createdAt)}</Text>
       </View>
-      {item.profileImage && (
-        <Image
-          source={{ uri: `${API_URL}${item.profileImage}` }}
-          style={styles.profileImage}
-        />
-      )}
+      <View style={styles.imageContainer}>
+        {item.profileImage ? (
+          <Image
+            source={{ uri: `${API_URL}${item.profileImage}` }}
+            style={styles.profileImage}
+          />
+        ) : (
+          <Ionicons name="person-circle" size={50} color={COLORS.primary} style={styles.profileImage} />
+        )}
+        <TouchableOpacity 
+          style={styles.deleteButton}
+          onPress={() => deleteInstructor(item._id)}
+        >
+          <Ionicons name="trash-outline" size={24} color={COLORS.error} />
+          <Text style={styles.deleteText}>Delete</Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 
@@ -168,6 +209,26 @@ const styles = StyleSheet.create({
   },
   instructorInfo: {
     flex: 1,
+    marginRight: SIZES.medium,
+  },
+  imageContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 80,
+  },
+  profileImage: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+  },
+  deleteButton: {
+    marginTop: SIZES.small,
+    alignItems: 'center',
+  },
+  deleteText: {
+    color: COLORS.error,
+    fontSize: SIZES.small,
+    marginTop: 2,
   },
   instructorName: {
     fontSize: SIZES.large,
@@ -179,12 +240,6 @@ const styles = StyleSheet.create({
     fontSize: SIZES.small,
     color: COLORS.gray,
     marginBottom: 2,
-  },
-  profileImage: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    marginLeft: SIZES.small,
   },
   addButton: {
     marginRight: 15,

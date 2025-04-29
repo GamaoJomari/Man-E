@@ -228,4 +228,29 @@ router.get('/users', verifyToken, async (req, res) => {
   }
 });
 
+// Delete user
+router.delete('/users/:id', verifyToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Check if user exists
+    const user = await User.findById(id);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Check if the requester is an administrator
+    if (req.user.role !== 'administrator') {
+      return res.status(403).json({ error: 'Access denied. Administrator only.' });
+    }
+
+    // Delete user
+    await User.findByIdAndDelete(id);
+    
+    res.json({ message: 'User deleted successfully' });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
 module.exports = router;
