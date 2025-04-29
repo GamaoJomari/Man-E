@@ -3,8 +3,8 @@ import { View, Text, StyleSheet, FlatList, TouchableOpacity, Image } from 'react
 import { COLORS, SIZES } from '../../constants/theme';
 import { router, Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import axios from 'axios';
 import { API_URL } from '../../constants/config';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface Student {
   _id: string;
@@ -27,11 +27,37 @@ export default function StudentsView() {
 
   const fetchStudents = async () => {
     try {
-      const response = await axios.get(`${API_URL}/api/users?role=student`);
-      setStudents(response.data);
+      // Get both token and user data
+      const [token, userStr] = await Promise.all([
+        AsyncStorage.getItem('token'),
+        AsyncStorage.getItem('user')
+      ]);
+
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
+
+      const user = userStr ? JSON.parse(userStr) : null;
+      if (!user || user.role !== 'administrator') {
+        throw new Error('Access denied. Administrator only.');
+      }
+
+      const response = await fetch(`${API_URL}/api/users?role=student`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to fetch students');
+      }
+      const data = await response.json();
+      setStudents(data);
       setLoading(false);
     } catch (err) {
-      setError('Failed to fetch students');
+      setError(err instanceof Error ? err.message : 'Failed to fetch students');
       setLoading(false);
       console.error('Error fetching students:', err);
     }

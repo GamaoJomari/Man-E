@@ -204,4 +204,28 @@ router.get('/users/me', verifyToken, async (req, res) => {
   }
 });
 
+// Get all students
+router.get('/users', verifyToken, async (req, res) => {
+  try {
+    const { role } = req.query;
+    
+    // Verify that the requesting user is an admin
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ error: 'Access denied. Admin only.' });
+    }
+
+    // Build query based on role parameter
+    const query = role ? { role } : {};
+    
+    const users = await User.find(query)
+      .select('-password') // Exclude password field
+      .sort({ fullName: 1 }); // Sort by fullName ascending
+    
+    res.json(users);
+  } catch (error) {
+    console.error('Error fetching users:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 module.exports = router;
