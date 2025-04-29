@@ -34,7 +34,18 @@ export default function AdminDashboard() {
           </View>
           <Text style={styles.menuText}>Register Accounts</Text>
         </TouchableOpacity>
+
+        <TouchableOpacity 
+          style={[styles.menuCard, { marginTop: SIZES.padding * 2 }]} 
+          onPress={() => router.push('/(app)/admin/overview' as any)}
+        >
+          <View style={styles.iconContainer}>
+            <Ionicons name="stats-chart-outline" size={40} color={COLORS.white} />
+          </View>
+          <Text style={styles.menuText}>Overview</Text>
+        </TouchableOpacity>
       </View>
+
 
       <View style={[styles.logoutContainer, { top: screenHeight - 100 }]}>
         <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
