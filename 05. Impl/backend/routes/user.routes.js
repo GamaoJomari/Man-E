@@ -209,9 +209,9 @@ router.get('/users', verifyToken, async (req, res) => {
   try {
     const { role } = req.query;
     
-    // Verify that the requesting user is an admin
-    if (req.user.role !== 'admin') {
-      return res.status(403).json({ error: 'Access denied. Admin only.' });
+    // Verify that the requesting user is an administrator
+    if (req.user.role !== 'administrator') {
+      return res.status(403).json({ error: 'Access denied. Administrator only.' });
     }
 
     // Build query based on role parameter
@@ -219,7 +219,7 @@ router.get('/users', verifyToken, async (req, res) => {
     
     const users = await User.find(query)
       .select('-password') // Exclude password field
-      .sort({ fullName: 1 }); // Sort by fullName ascending
+      .sort({ createdAt: -1 }); // Sort by creation date, newest first
     
     res.json(users);
   } catch (error) {

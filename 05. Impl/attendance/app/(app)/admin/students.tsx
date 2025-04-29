@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, Image } from 'react-native';
-import { COLORS, SIZES } from '../../constants/theme';
+import { COLORS, SIZES, SHADOWS } from '../../constants/theme';
 import { router, Stack } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { API_URL } from '../../constants/config';
@@ -20,6 +20,7 @@ export default function StudentsView() {
   const [students, setStudents] = useState<Student[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
 
   useEffect(() => {
     fetchStudents();
@@ -53,184 +54,183 @@ export default function StudentsView() {
         const errorData = await response.json();
         throw new Error(errorData.error || 'Failed to fetch students');
       }
+
       const data = await response.json();
       setStudents(data);
-      setLoading(false);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch students');
-      setLoading(false);
       console.error('Error fetching students:', err);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
     }
   };
 
-  const renderStudent = ({ item }: { item: Student }) => (
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    fetchStudents();
+  }, []);
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    });
+  };
+
+  if (loading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <Text style={styles.loadingText}>Loading students...</Text>
+      </View>
+    );
+  }
+
+  if (error) {
+    return (
+      <View style={styles.errorContainer}>
+        <Text style={styles.errorText}>{error}</Text>
+        <TouchableOpacity style={styles.retryButton} onPress={fetchStudents}>
+          <Text style={styles.retryButtonText}>Retry</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  const renderItem = ({ item }: { item: Student }) => (
     <View style={styles.studentCard}>
       <View style={styles.studentInfo}>
-        <View style={styles.imageContainer}>
-          {item.profileImage ? (
-            <Image 
-              source={{ uri: `${API_URL}${item.profileImage}` }}
-              style={styles.profileImage}
-            />
-          ) : (
-            <View style={styles.placeholderImage}>
-              <Ionicons name="person" size={30} color={COLORS.white} />
-            </View>
-          )}
-        </View>
-        <View style={styles.textContainer}>
-          <Text style={styles.nameText}>{item.fullName}</Text>
-          <Text style={styles.detailText}>ID: {item.studentId}</Text>
-          <Text style={styles.detailText}>{item.phoneNumber}</Text>
-        </View>
+        <Text style={styles.studentName}>{item.fullName}</Text>
+        <Text style={styles.studentDetail}>ID: {item.studentId}</Text>
+        <Text style={styles.studentDetail}>Username: {item.username}</Text>
+        <Text style={styles.studentDetail}>Phone: {item.phoneNumber}</Text>
+        <Text style={styles.studentDetail}>Registered: {formatDate(item.createdAt)}</Text>
       </View>
+      {item.profileImage && (
+        <Image
+          source={{ uri: `${API_URL}${item.profileImage}` }}
+          style={styles.profileImage}
+        />
+      )}
     </View>
   );
 
   return (
-    <>
-      <Stack.Screen 
+    <View style={styles.container}>
+      <Stack.Screen
         options={{
-          headerShown: false
-        }} 
+          headerStyle: { backgroundColor: COLORS.primary },
+          headerTintColor: '#fff',
+          title: 'Students List',
+          headerRight: () => (
+            <TouchableOpacity
+              style={styles.addButton}
+              onPress={() => router.push('/admin/register-student')}
+            >
+              <Ionicons name="add" size={24} color="#fff" />
+            </TouchableOpacity>
+          ),
+        }}
       />
-      <View style={styles.container}>
-        <Text style={styles.headerTitle}>Students</Text>
-
-        {loading ? (
-          <View style={styles.centerContent}>
-            <Text style={styles.loadingText}>Loading...</Text>
+      <FlatList
+        data={students}
+        renderItem={renderItem}
+        keyExtractor={(item) => item._id}
+        contentContainerStyle={styles.listContainer}
+        refreshing={refreshing}
+        onRefresh={onRefresh}
+        ListEmptyComponent={
+          <View style={styles.emptyContainer}>
+            <Text style={styles.emptyText}>No students registered yet</Text>
           </View>
-        ) : error ? (
-          <View style={styles.centerContent}>
-            <Text style={styles.errorText}>{error}</Text>
-          </View>
-        ) : (
-          <FlatList
-            data={students}
-            renderItem={renderStudent}
-            keyExtractor={(item) => item._id}
-            contentContainerStyle={styles.listContainer}
-            showsVerticalScrollIndicator={false}
-          />
-        )}
-
-        <View style={styles.backContainer}>
-          <TouchableOpacity 
-            style={styles.backButton} 
-            onPress={() => router.back()}
-          >
-            <Text style={styles.backText}>Back</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-    </>
+        }
+      />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#000000',
-    paddingTop: SIZES.padding * 4,
-  },
-  headerTitle: {
-    fontSize: SIZES.xLarge,
-    color: COLORS.white,
-    fontWeight: 'bold',
-    paddingHorizontal: SIZES.padding,
-    marginBottom: SIZES.padding * 2,
+    backgroundColor: COLORS.background,
   },
   listContainer: {
-    padding: SIZES.padding,
+    padding: SIZES.medium,
   },
   studentCard: {
-    backgroundColor: 'rgba(0, 0, 0, 0.8)',
-    borderRadius: 15,
-    padding: SIZES.padding,
-    marginBottom: SIZES.padding,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-    shadowColor: "#fff",
-    shadowOffset: {
-      width: 0,
-      height: 0,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
-    elevation: 5,
+    backgroundColor: COLORS.white,
+    borderRadius: SIZES.small,
+    padding: SIZES.medium,
+    marginBottom: SIZES.medium,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    ...SHADOWS.medium,
   },
   studentInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  imageContainer: {
-    marginRight: SIZES.padding,
-  },
-  profileImage: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-  },
-  placeholderImage: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: COLORS.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  textContainer: {
     flex: 1,
   },
-  nameText: {
-    color: COLORS.white,
-    fontSize: SIZES.medium,
-    fontWeight: '600',
-    marginBottom: 4,
+  studentName: {
+    fontSize: SIZES.large,
+    fontWeight: 'bold',
+    color: COLORS.primary,
+    marginBottom: 5,
   },
-  detailText: {
-    color: 'rgba(255, 255, 255, 0.7)',
+  studentDetail: {
     fontSize: SIZES.small,
+    color: COLORS.gray,
     marginBottom: 2,
   },
-  centerContent: {
+  profileImage: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    marginLeft: SIZES.small,
+  },
+  addButton: {
+    marginRight: 15,
+  },
+  loadingContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: COLORS.background,
   },
   loadingText: {
-    color: COLORS.white,
-    fontSize: SIZES.medium,
-  },
-  errorText: {
     color: COLORS.primary,
     fontSize: SIZES.medium,
   },
-  backContainer: {
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
     alignItems: 'center',
-    paddingBottom: SIZES.padding * 2,
+    backgroundColor: COLORS.background,
+    padding: SIZES.large,
   },
-  backButton: {
-    backgroundColor: 'rgba(0, 0, 0, 0.8)',
-    paddingVertical: SIZES.small,
-    paddingHorizontal: SIZES.large,
-    borderRadius: 15,
-    minWidth: 120,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.1)',
-    shadowColor: "#fff",
-    shadowOffset: {
-      width: 0,
-      height: 0,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
-    elevation: 5,
+  errorText: {
+    color: COLORS.error,
+    fontSize: SIZES.medium,
+    textAlign: 'center',
+    marginBottom: SIZES.medium,
   },
-  backText: {
+  retryButton: {
+    backgroundColor: COLORS.primary,
+    padding: SIZES.small,
+    borderRadius: SIZES.small,
+  },
+  retryButtonText: {
     color: COLORS.white,
     fontSize: SIZES.medium,
   },
-}); 
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: SIZES.xxLarge,
+  },
+  emptyText: {
+    color: COLORS.gray,
+    fontSize: SIZES.medium,
+  },
+});
