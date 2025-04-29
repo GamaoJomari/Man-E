@@ -1,0 +1,100 @@
+import React from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { COLORS, SIZES, SHADOWS } from '../../constants/theme';
+import { router } from 'expo-router';
+
+export default function StudentDashboard() {
+  return (
+    <View style={styles.container}>
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>Student Dashboard</Text>
+        <TouchableOpacity 
+          style={styles.logoutButton}
+          onPress={() => router.replace('/(auth)/login')}
+        >
+          <Text style={styles.logoutText}>Logout</Text>
+        </TouchableOpacity>
+      </View>
+
+      <ScrollView style={styles.content}>
+        <View style={styles.grid}>
+          <TouchableOpacity style={styles.card}>
+            <Text style={styles.cardTitle}>Mark Attendance</Text>
+            <Text style={styles.cardDescription}>Check in for class</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.card}>
+            <Text style={styles.cardTitle}>My Schedule</Text>
+            <Text style={styles.cardDescription}>View class schedule</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.card}>
+            <Text style={styles.cardTitle}>Attendance History</Text>
+            <Text style={styles.cardDescription}>View past attendance</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.card} onPress={() => router.push('/student/profile')}>
+            <Text style={styles.cardTitle}>Profile</Text>
+            <Text style={styles.cardDescription}>View and edit profile</Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: COLORS.background,
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: SIZES.medium,
+    backgroundColor: COLORS.primary,
+    ...SHADOWS.medium,
+  },
+  headerTitle: {
+    fontSize: SIZES.xLarge,
+    color: COLORS.white,
+    fontWeight: 'bold',
+  },
+  logoutButton: {
+    padding: SIZES.small,
+    backgroundColor: COLORS.white,
+    borderRadius: SIZES.small,
+  },
+  logoutText: {
+    color: COLORS.primary,
+    fontWeight: 'bold',
+  },
+  content: {
+    flex: 1,
+    padding: SIZES.medium,
+  },
+  grid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+  },
+  card: {
+    width: '48%',
+    backgroundColor: COLORS.white,
+    borderRadius: SIZES.medium,
+    padding: SIZES.medium,
+    marginBottom: SIZES.medium,
+    ...SHADOWS.small,
+  },
+  cardTitle: {
+    fontSize: SIZES.large,
+    fontWeight: 'bold',
+    color: COLORS.primary,
+    marginBottom: 5,
+  },
+  cardDescription: {
+    fontSize: SIZES.small,
+    color: COLORS.gray,
+  },
+});
