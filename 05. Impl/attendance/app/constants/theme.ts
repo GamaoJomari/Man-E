@@ -7,6 +7,7 @@ export const COLORS = {
   lightGray: '#D3D3D3',
   white: '#FFFFFF',
   black: '#000000',
+  error: '#FF0000',
 };
 
 export const SIZES = {

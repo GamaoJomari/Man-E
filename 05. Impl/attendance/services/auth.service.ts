@@ -8,6 +8,7 @@ interface User {
   role: string;
   fullName: string;
   studentId?: string;
+  instructorId?: string;
   phoneNumber?: string;
   profileImage?: string | null;
 }
