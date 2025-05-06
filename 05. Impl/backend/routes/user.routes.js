@@ -5,6 +5,7 @@ const path = require('path');
 const fs = require('fs');
 const jwt = require('jsonwebtoken');
 const User = require('../models/user.model');
+const auth = require('../middleware/auth');
 
 // JWT secret key
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
@@ -205,7 +206,7 @@ router.get('/users/me', verifyToken, async (req, res) => {
 });
 
 // Get all students
-router.get('/users', verifyToken, async (req, res) => {
+router.get('/users', auth, async (req, res) => {
   try {
     const { role } = req.query;
     
@@ -229,7 +230,7 @@ router.get('/users', verifyToken, async (req, res) => {
 });
 
 // Delete user
-router.delete('/users/:id', verifyToken, async (req, res) => {
+router.delete('/users/:id', auth, async (req, res) => {
   try {
     const { id } = req.params;
     

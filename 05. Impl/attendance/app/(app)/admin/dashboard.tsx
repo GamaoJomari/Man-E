@@ -37,6 +37,16 @@ export default function AdminDashboard() {
 
         <TouchableOpacity 
           style={[styles.menuCard, { marginTop: SIZES.padding * 2 }]} 
+          onPress={() => router.push('/(app)/admin/create-courses' as any)}
+        >
+          <View style={styles.iconContainer}>
+            <Ionicons name="book-outline" size={40} color={COLORS.white} />
+          </View>
+          <Text style={styles.menuText}>Create Courses</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity 
+          style={[styles.menuCard, { marginTop: SIZES.padding * 2 }]} 
           onPress={() => router.push('/(app)/admin/overview' as any)}
         >
           <View style={styles.iconContainer}>
