@@ -5,6 +5,7 @@ const path = require('path');
 const fs = require('fs');
 const jwt = require('jsonwebtoken');
 const User = require('../models/user.model');
+const auth = require('../middleware/auth');
 
 // JWT secret key
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
@@ -205,7 +206,7 @@ router.get('/users/me', verifyToken, async (req, res) => {
 });
 
 // Get all students
-router.get('/users', verifyToken, async (req, res) => {
+router.get('/users', auth, async (req, res) => {
   try {
     const { role } = req.query;
     
@@ -225,6 +226,31 @@ router.get('/users', verifyToken, async (req, res) => {
   } catch (error) {
     console.error('Error fetching users:', error);
     res.status(500).json({ error: error.message });
+  }
+});
+
+// Delete user
+router.delete('/users/:id', auth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Check if user exists
+    const user = await User.findById(id);
+    if (!user) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    // Check if the requester is an administrator
+    if (req.user.role !== 'administrator') {
+      return res.status(403).json({ error: 'Access denied. Administrator only.' });
+    }
+
+    // Delete user
+    await User.findByIdAndDelete(id);
+    
+    res.json({ message: 'User deleted successfully' });
+  } catch (error) {
+    res.status(400).json({ error: error.message });
   }
 });
 

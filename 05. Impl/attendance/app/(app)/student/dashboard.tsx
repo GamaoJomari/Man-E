@@ -1,9 +1,32 @@
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Modal } from 'react-native';
 import { COLORS, SIZES, SHADOWS } from '../../constants/theme';
 import { router } from 'expo-router';
+import { Ionicons } from '@expo/vector-icons';
+import QRCode from 'react-native-qrcode-svg';
+import { useAuth } from '../../context/AuthContext';
 
 export default function StudentDashboard() {
+  const [showQRCode, setShowQRCode] = useState(false);
+  const { user, refreshUser } = useAuth();
+
+  useEffect(() => {
+    if (showQRCode) {
+      refreshUser();
+    }
+  }, [showQRCode]);
+
+  const generateQRData = () => {
+    if (!user) return '';
+    // Create a unique string combining student ID and timestamp
+    const timestamp = new Date().getTime();
+    return JSON.stringify({
+      studentId: user.studentId,
+      fullName: user.fullName,
+      timestamp: timestamp,
+    });
+  };
+
   return (
     <View style={styles.container}>
       <View style={styles.header}>
@@ -16,29 +39,60 @@ export default function StudentDashboard() {
         </TouchableOpacity>
       </View>
 
-      <ScrollView style={styles.content}>
-        <View style={styles.grid}>
-          <TouchableOpacity style={styles.card}>
-            <Text style={styles.cardTitle}>Mark Attendance</Text>
-            <Text style={styles.cardDescription}>Check in for class</Text>
-          </TouchableOpacity>
+      <View style={styles.content}>
+        {/* Main content area - can be used for future content */}
+      </View>
 
-          <TouchableOpacity style={styles.card}>
-            <Text style={styles.cardTitle}>My Schedule</Text>
-            <Text style={styles.cardDescription}>View class schedule</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.card}>
-            <Text style={styles.cardTitle}>Attendance History</Text>
-            <Text style={styles.cardDescription}>View past attendance</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.card} onPress={() => router.push('/student/profile')}>
-            <Text style={styles.cardTitle}>Profile</Text>
-            <Text style={styles.cardDescription}>View and edit profile</Text>
-          </TouchableOpacity>
+      <Modal
+        visible={showQRCode}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowQRCode(false)}
+      >
+        <View style={styles.modalContainer}>
+          <View style={styles.qrContainer}>
+            <Text style={styles.qrTitle}>Your Attendance QR Code</Text>
+            {user?.studentId ? (
+              <QRCode
+                value={generateQRData()}
+                size={200}
+                backgroundColor="white"
+                color="black"
+              />
+            ) : (
+              <Text style={styles.errorText}>No student ID found. Please contact your administrator.</Text>
+            )}
+            <Text style={styles.qrSubtitle}>Show this to your instructor</Text>
+            <TouchableOpacity
+              style={styles.closeButton}
+              onPress={() => setShowQRCode(false)}
+            >
+              <Text style={styles.closeButtonText}>Close</Text>
+            </TouchableOpacity>
+          </View>
         </View>
-      </ScrollView>
+      </Modal>
+
+      <View style={styles.navigationBar}>
+        <TouchableOpacity 
+          style={styles.navButton}
+          onPress={() => setShowQRCode(true)}
+        >
+          <Ionicons name="qr-code-outline" size={24} color={COLORS.primary} />
+          <Text style={styles.navButtonText}>QR Code</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.navButton}>
+          <Ionicons name="calendar-outline" size={24} color={COLORS.primary} />
+          <Text style={styles.navButtonText}>Schedule</Text>
+        </TouchableOpacity>
+        <TouchableOpacity 
+          style={styles.navButton}
+          onPress={() => router.push('/student/profile')}
+        >
+          <Ionicons name="person-outline" size={24} color={COLORS.primary} />
+          <Text style={styles.navButtonText}>Profile</Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 }
@@ -72,29 +126,66 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    padding: SIZES.medium,
   },
-  grid: {
+  navigationBar: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-  },
-  card: {
-    width: '48%',
+    justifyContent: 'space-around',
+    alignItems: 'center',
     backgroundColor: COLORS.white,
-    borderRadius: SIZES.medium,
-    padding: SIZES.medium,
-    marginBottom: SIZES.medium,
-    ...SHADOWS.small,
+    paddingVertical: 10,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.gray,
+    ...SHADOWS.medium,
   },
-  cardTitle: {
+  navButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 10,
+  },
+  navButtonText: {
+    color: COLORS.primary,
+    fontSize: SIZES.small,
+    marginTop: 4,
+  },
+  modalContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  qrContainer: {
+    backgroundColor: 'white',
+    padding: 20,
+    borderRadius: 10,
+    alignItems: 'center',
+    ...SHADOWS.medium,
+  },
+  qrTitle: {
     fontSize: SIZES.large,
     fontWeight: 'bold',
+    marginBottom: 20,
     color: COLORS.primary,
-    marginBottom: 5,
   },
-  cardDescription: {
-    fontSize: SIZES.small,
+  qrSubtitle: {
+    fontSize: SIZES.medium,
     color: COLORS.gray,
+    marginTop: 20,
+    marginBottom: 10,
+  },
+  closeButton: {
+    backgroundColor: COLORS.primary,
+    padding: 10,
+    borderRadius: 5,
+    marginTop: 10,
+  },
+  closeButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
+  },
+  errorText: {
+    color: COLORS.error,
+    fontSize: SIZES.medium,
+    textAlign: 'center',
+    marginVertical: 20,
   },
 });
